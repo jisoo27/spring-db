@@ -5,6 +5,7 @@ import hello.jdbc.domain.Member;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.*;
+import java.util.NoSuchElementException;
 
 /*
 *  JDBC - DriverManager 사용
@@ -37,7 +38,7 @@ public class MemberRepositoryV0 {
         }
     }
 
-    private void close(Connection con, Statement stmt, ResultSet rs) {
+    private void close(Connection con, Statement stmt, ResultSet rs) { // 해제는 이 순서대로 아래의 로직대로 해제되게 된다.
 
         if (rs != null) {
             try {
@@ -66,8 +67,38 @@ public class MemberRepositoryV0 {
     }
 
 
-
     private Connection getConnection() {
         return DBConnectionUtil.getConnection();
+    }
+
+    public Member findById (String memberId) throws SQLException {
+        String sql = "select * from member where member_id = ?";
+
+        Connection con = null; // finally 에서 사용하기 위해 여기에 선언해줘야한다.
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            con = getConnection();
+            pstmt = con.prepareStatement(sql);
+            pstmt.setString(1, memberId);
+
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) { // next를 한번은 꼭 호출해주어야 데이터가 있는지 없는지를 확인한다. 첫번째 데이터가 있으면 true 반환
+                Member member = new Member();
+                member.setMemberId(rs.getString("member_id"));
+                member.setMoney(rs.getInt("money"));
+                return member;
+            } else {
+                throw new NoSuchElementException("member not found memberId = " + memberId); // 이렇게 키 값을 넣어줘야 어떤 member에서 에러가 난건지 단번에 알 수 있다.
+            }
+
+        } catch (SQLException e) {
+            log.info("error", e);
+            throw e;
+        } finally {
+            close(con, pstmt, rs);
+        }
     }
 }
